@@ -1,0 +1,68 @@
+[
+  {
+    "lat": -6.2056,
+    "lon": 106.8376,
+    "accuracy": 5000,
+    "altitude": 0.0,
+    "speed": 0.0,
+    "city": "Jakarta",
+    "isp": "PT. TELKOM INDONESIA",
+    "timestamp": "2026-05-02T17:58:06.592495",
+    "source": "ip"
+  },
+  {
+    "lat": -6.2056,
+    "lon": 106.8376,
+    "accuracy": 5000,
+    "altitude": 0.0,
+    "speed": 0.0,
+    "city": "Jakarta",
+    "isp": "PT. TELKOM INDONESIA",
+    "timestamp": "2026-05-02T15:05:12.957334",
+    "source": "ip"
+  },
+  {
+    "lat": -6.2056,
+    "lon": 106.8376,
+    "accuracy": 5000,
+    "altitude": 0.0,
+    "speed": 0.0,
+    "city": "Jakarta",
+    "isp": "PT. TELKOM INDONESIA",
+    "timestamp": "2026-05-02T15:04:42.799260",
+    "source": "ip"
+  },
+  {
+    "lat": -6.2056,
+    "lon": 106.8376,
+    "accuracy": 5000,
+    "altitude": 0.0,
+    "speed": 0.0,
+    "city": "Jakarta",
+    "isp": "PT. TELKOM INDONESIA",
+    "timestamp": "2026-05-02T15:04:12.623744",
+    "source": "ip"
+  },
+  {
+    "lat": -6.2056,
+    "lon": 106.8376,
+    "accuracy": 5000,
+    "altitude": 0.0,
+    "speed": 0.0,
+    "city": "Jakarta",
+    "isp": "PT. TELKOM INDONESIA",
+    "timestamp": "2026-05-02T14:16:22.784668",
+    "source": "ip"
+  },
+  {
+    "lat": -6.2056,
+    "lon": 106.8376,
+    "accuracy": 5000,
+    "altitude": 0.0,
+    "speed": 0.0,
+    "city": "Jakarta",
+    "isp": "PT. TELKOM INDONESIA",
+    "timestamp": "2026-05-02T14:16:00.299458",
+    "source": "ip"
+  }
+]

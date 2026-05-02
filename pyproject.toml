@@ -1,0 +1,25 @@
+[tool.flet]
+app_name = "HP Tracker"
+app_id = "com.hptracker.app"
+product_name = "HP Tracker"
+description = "Aplikasi pelacak lokasi HP otomatis"
+version = "1.0.0"
+build_number = 1
+
+[tool.flet.android]
+# Izin yang dibutuhkan di Android
+permissions = [
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.ACCESS_BACKGROUND_LOCATION",
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.FOREGROUND_SERVICE_LOCATION",
+    "android.permission.INTERNET",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+]
+# Foreground service agar tidak dimatikan Android
+features = [
+    "android.hardware.location",
+    "android.hardware.location.gps",
+]
