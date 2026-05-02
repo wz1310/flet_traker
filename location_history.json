@@ -7,6 +7,17 @@
     "speed": 0.0,
     "city": "Jakarta",
     "isp": "PT. TELKOM INDONESIA",
+    "timestamp": "2026-05-02T21:07:44.786375",
+    "source": "ip"
+  },
+  {
+    "lat": -6.2056,
+    "lon": 106.8376,
+    "accuracy": 5000,
+    "altitude": 0.0,
+    "speed": 0.0,
+    "city": "Jakarta",
+    "isp": "PT. TELKOM INDONESIA",
     "timestamp": "2026-05-02T17:58:06.592495",
     "source": "ip"
   },

@@ -1,4 +1,5 @@
 import flet as ft
+import flet_geolocator
 import threading
 from datetime import datetime
 from tracker_service import TrackerService
@@ -20,6 +21,32 @@ def main(page: ft.Page):
     is_tracking = False
     location_history = []
     current_tab = 0
+
+    def on_position_change(e):
+        if not is_tracking:
+            return
+        p = e.position
+        loc = {
+            "lat": p.latitude,
+            "lon": p.longitude,
+            "accuracy": round(p.accuracy or 0, 1),
+            "altitude": p.altitude or 0.0,
+            "speed": p.speed or 0.0,
+            "timestamp": p.timestamp.isoformat() if p.timestamp else datetime.now().isoformat()
+        }
+        tracker.update_location(loc)
+        update_location_ui(loc)
+
+    # Geolocator membutuhkan akses hardware Native (hanya jalan di APK Android/iOS).
+    # Di Windows/Desktop standar, control ini tidak dikenali dan akan memunculkan layar merah.
+    if page.platform in [ft.PagePlatform.ANDROID, ft.PagePlatform.IOS]:
+        geolocator = flet_geolocator.Geolocator(
+            on_position_change=on_position_change,
+            on_error=lambda e: add_log(f"GPS Error: {e.data}")
+        )
+        page.overlay.append(geolocator)
+    else:
+        geolocator = None
 
     # ── Status card refs ───────────────────────────────────
     status_icon = ft.Icon(ft.Icons.LOCATION_OFF, color=ft.Colors.RED_400, size=40)
@@ -308,10 +335,9 @@ def main(page: ft.Page):
         refresh_history()
         page.update()
 
-    def on_location_received(loc: dict, sent_ok: bool):
-        update_location_ui(loc)
+    def on_telegram_sent(loc: dict, sent_ok: bool):
         status = "✓ Terkirim ke Telegram" if sent_ok else "⚠ Gagal kirim"
-        add_log(f"Lokasi: {loc['lat']:.5f}, {loc['lon']:.5f} — {status}")
+        add_log(f"Telegram ({loc['lat']:.5f}, {loc['lon']:.5f}) — {status}")
 
     # ── Toggle tracking ────────────────────────────────────
     def toggle_tracking(e):
@@ -328,7 +354,13 @@ def main(page: ft.Page):
             config.device_name = device_name_field.value.strip() or "HP Saya"
             config.save()
 
-            tracker.start(callback=on_location_received)
+            if geolocator:
+                geolocator.request_permission()
+                tracker.start(callback=on_telegram_sent)
+            else:
+                add_log("⚠ Mode Uji Coba PC: GPS hardware tidak didukung di Windows/PC.")
+                # We can still start the tracker, but it won't have GPS data
+                tracker.start(callback=on_telegram_sent)
 
             toggle_btn.content = ft.Row(
                 [ft.Icon(ft.Icons.STOP, size=18), ft.Text("STOP TRACKING", size=13, weight=ft.FontWeight.BOLD)],
@@ -371,11 +403,24 @@ def main(page: ft.Page):
     def send_now(e):
         def _send():
             loc = tracker.get_location_once()
+            if not loc:
+                if geolocator:
+                    try:
+                        p = geolocator.get_current_position()
+                        if p:
+                            loc = {
+                                "lat": p.latitude, "lon": p.longitude,
+                                "accuracy": round(p.accuracy or 0, 1),
+                                "timestamp": datetime.now().isoformat()
+                            }
+                    except Exception:
+                        pass
+
             if loc:
                 sent = tracker.send_to_telegram(loc)
-                on_location_received(loc, sent)
+                on_telegram_sent(loc, sent)
             else:
-                add_log("⚠ Gagal mendapatkan lokasi")
+                add_log("⚠ Gagal: GPS belum mendapatkan lokasi.")
         threading.Thread(target=_send, daemon=True).start()
 
     def save_settings():

@@ -1,10 +1,6 @@
 """
-TrackerService — handles GPS polling and Telegram delivery.
-
-Platform detection:
-  - Android (via Flet/Kivy runtime): uses plyer.gps
-  - Desktop / fallback: uses ip-api.com for approximate location
-    (useful for testing on PC before deploying to Android)
+TrackerService — handles Telegram delivery and location history.
+GPS tracking is now natively handled by flet_geolocator in main.py.
 """
 
 import threading
@@ -18,21 +14,6 @@ from typing import Callable, Optional
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "location_history.json")
 
 
-def _is_android() -> bool:
-    try:
-        import android  # noqa: F401
-        return True
-    except ImportError:
-        pass
-    try:
-        from plyer import gps  # noqa: F401
-        import platform
-        return platform.system() == "Linux" and "ANDROID_ROOT" in os.environ
-    except ImportError:
-        pass
-    return False
-
-
 class TrackerService:
     def __init__(self, config):
         self.config = config
@@ -40,112 +21,47 @@ class TrackerService:
         self._thread: Optional[threading.Thread] = None
         self._last_location: Optional[dict] = None
         self._callback: Optional[Callable] = None
-        self._android = _is_android()
-        self._gps = None
 
-        if self._android:
-            self._init_android_gps()
-
-    # ── Android GPS ────────────────────────────────────────
-    def _init_android_gps(self):
-        try:
-            from plyer import gps
-            self._gps = gps
-            self._gps.configure(
-                on_location=self._on_android_location,
-                on_status=self._on_android_status,
-            )
-            print("[GPS] Android GPS dikonfigurasi")
-        except Exception as ex:
-            print(f"[GPS] Gagal init Android GPS: {ex}")
-            self._android = False
-
-    def _on_android_location(self, **kwargs):
-        loc = {
-            "lat": kwargs.get("lat", 0.0),
-            "lon": kwargs.get("lon", 0.0),
-            "accuracy": round(kwargs.get("accuracy", 0), 1),
-            "altitude": kwargs.get("altitude", 0.0),
-            "speed": kwargs.get("speed", 0.0),
-            "timestamp": datetime.now().isoformat(),
-        }
+    def update_location(self, loc: dict):
+        """Called by main.py whenever Geolocator receives a new position."""
         self._last_location = loc
-        self._save_history(loc)
 
-        if self._callback:
-            sent = self.send_to_telegram(loc)
-            self._callback(loc, sent)
-
-    def _on_android_status(self, stype, status):
-        print(f"[GPS] Status: {stype} — {status}")
-
-    # ── IP-based fallback (desktop / testing) ─────────────
-    def _get_location_by_ip(self) -> Optional[dict]:
-        try:
-            r = requests.get("http://ip-api.com/json/", timeout=8)
-            if r.status_code == 200:
-                d = r.json()
-                if d.get("status") == "success":
-                    return {
-                        "lat": d["lat"],
-                        "lon": d["lon"],
-                        "accuracy": 5000,  # IP-based, low accuracy
-                        "altitude": 0.0,
-                        "speed": 0.0,
-                        "city": d.get("city", ""),
-                        "isp": d.get("isp", ""),
-                        "timestamp": datetime.now().isoformat(),
-                        "source": "ip",
-                    }
-        except Exception as ex:
-            print(f"[GPS] IP fallback gagal: {ex}")
-        return None
-
-    # ── Public API ─────────────────────────────────────────
     def get_location_once(self) -> Optional[dict]:
-        """Get a single location fix (blocking, max ~10s)."""
-        if self._android and self._gps:
-            # On Android, last known location from continuous updates
-            return self._last_location
-        return self._get_location_by_ip()
+        """Get the latest known location."""
+        return self._last_location
 
     def start(self, callback: Callable):
         if self._running:
             return
         self._running = True
         self._callback = callback
-
-        if self._android and self._gps:
-            try:
-                self._gps.start(minTime=self.config.interval_seconds * 1000, minDistance=0)
-                print("[GPS] Android GPS dimulai")
-            except Exception as ex:
-                print(f"[GPS] Gagal start Android GPS: {ex}")
-        else:
-            # Desktop polling thread
-            self._thread = threading.Thread(target=self._poll_loop, daemon=True)
-            self._thread.start()
-            print("[GPS] Desktop polling dimulai (IP-based)")
+        
+        # Start a background thread that sends location to Telegram every interval_seconds
+        self._thread = threading.Thread(target=self._telegram_loop, daemon=True)
+        self._thread.start()
+        print("[TrackerService] Tracking dimulai")
 
     def stop(self):
         self._running = False
-        if self._android and self._gps:
-            try:
-                self._gps.stop()
-            except Exception:
-                pass
-        print("[GPS] Tracking dihentikan")
+        print("[TrackerService] Tracking dihentikan")
 
-    def _poll_loop(self):
-        """Background polling loop for desktop/IP fallback."""
+    def _telegram_loop(self):
+        """Background loop to periodically send the latest location to Telegram."""
+        last_sent_timestamp = None
+
         while self._running:
-            loc = self._get_location_by_ip()
-            if loc and self._callback:
+            loc = self._last_location
+            
+            # Only send if we have a location and it's newer than the last sent one
+            if loc and loc.get("timestamp") != last_sent_timestamp:
                 self._save_history(loc)
                 sent = self.send_to_telegram(loc)
-                self._callback(loc, sent)
+                if self._callback:
+                    self._callback(loc, sent)
+                last_sent_timestamp = loc.get("timestamp")
+            
             # Sleep in small chunks so stop() is responsive
-            for _ in range(self.config.interval_seconds * 2):
+            for _ in range(max(1, self.config.interval_seconds * 2)):
                 if not self._running:
                     break
                 time.sleep(0.5)
@@ -158,7 +74,7 @@ class TrackerService:
             return False
 
         maps_url = f"https://maps.google.com/?q={loc['lat']},{loc['lon']}"
-        source_label = "📡 GPS" if loc.get("source") != "ip" else "🌐 IP (perkiraan)"
+        source_label = "📡 GPS Device"
         ts = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         text = (
